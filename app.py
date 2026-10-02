@@ -97,7 +97,8 @@ def process_playlist(dump_dir, token, user_id, headers):
         return
         
     print(f"Extracted playlist name: '{playlist_name}'")
-    state_file = f"{playlist_name.replace(' ', '_')}_state.json"
+    safe_name = playlist_name.replace(' ', '_').replace('/', '_')
+    state_file = f"{safe_name}_state.json"
     
     track_ids = []
     
