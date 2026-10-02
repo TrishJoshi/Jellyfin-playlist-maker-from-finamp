@@ -121,31 +121,34 @@ def main():
             track_ids = json.load(f)
     else:
         extracted_tracks = []
-        seen_titles = set()
-        
-        for xml_file in xml_files:
-            try:
-                tree = ET.parse(xml_file)
-                root = tree.getroot()
-                
-                # Iterate through all UI nodes
-                for node in root.iter('node'):
-                    desc = node.get('content-desc', '')
+        tracks_json = os.path.join(dump_dir, "tracks.json")
+        if os.path.exists(tracks_json):
+            print(f"Found tracks.json! Loading pre-extracted tracks...")
+            with open(tracks_json, "r", encoding="utf-8") as f:
+                tracks_data = json.load(f)
+            extracted_tracks = [(t["title"], t["artist"]) for t in tracks_data]
+        else:
+            print("tracks.json not found, falling back to raw XML parsing...")
+            seen_titles = set()
+            for xml_file in xml_files:
+                try:
+                    tree = ET.parse(xml_file)
+                    root = tree.getroot()
                     
-                    # Finamp track nodes contain newlines and end with "Seconds"
-                    if desc and '\n' in desc and 'Seconds' in desc:
-                        parts = desc.split('\n')
-                        if len(parts) >= 2:
-                            title = parts[0].strip()
-                            artist = parts[1].strip()
-                            
-                            if title not in seen_titles:
-                                seen_titles.add(title)
-                                extracted_tracks.append((title, artist))
-            except ET.ParseError:
-                print(f"Skipping malformed XML file: {xml_file}")
+                    for node in root.iter('node'):
+                        desc = node.get('content-desc', '')
+                        if desc and '\n' in desc and 'Seconds' in desc:
+                            parts = desc.split('\n')
+                            if len(parts) >= 2:
+                                title = parts[0].strip()
+                                artist = parts[1].strip()
+                                if title not in seen_titles:
+                                    seen_titles.add(title)
+                                    extracted_tracks.append((title, artist))
+                except ET.ParseError:
+                    print(f"Skipping malformed XML file: {xml_file}")
 
-        print(f"Extracted {len(extracted_tracks)} unique tracks from dumps.")
+        print(f"Extracted {len(extracted_tracks)} unique tracks.")
         
         for title, artist in extracted_tracks:
             track_id = search_jellyfin_for_track(title, artist, user_id, headers)

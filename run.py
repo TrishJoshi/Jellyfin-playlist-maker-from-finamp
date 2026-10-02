@@ -30,7 +30,7 @@ def extract_playlist_name(filepath):
         for node in tree.iter('node'):
             desc = node.get('content-desc', '')
             if desc:
-                if re.search(r'\d+ Track(s)? \([\d:]+\)', desc):
+                if re.search(r'\d+ Track(s)? \(\d+:\d+\)', desc):
                     return prev_desc.strip()
                 prev_desc = desc
     except ET.ParseError:
@@ -71,24 +71,15 @@ def main():
         print(f"Detected Playlist: '{playlist_name}'")
         
         safe_dir_name = playlist_name.replace("/", "_")
-        base_dir_name = os.path.join("playlists", safe_dir_name)
-        dir_name = base_dir_name
-        is_new_run = False
+        dir_name = os.path.join("playlists", safe_dir_name)
         
-        if os.path.exists(base_dir_name):
-            print(f"Warning: Directory '{base_dir_name}' already exists. Creating a temporary directory to compare later.")
-            dir_name = base_dir_name + "_temp_run"
-            is_new_run = True
-            if os.path.exists(dir_name):
-                import shutil
-                shutil.rmtree(dir_name)
-                
+        if os.path.exists(dir_name):
+            print(f"Warning: Directory '{dir_name}' already exists. Overwriting/Appending dumps...")
         os.makedirs(dir_name, exist_ok=True)
         
         i = 1
         target_xml = os.path.join(dir_name, f"dump_{i}.xml")
-        import shutil
-        shutil.move(temp_xml, target_xml)
+        os.rename(temp_xml, target_xml)
         
         prev_hash = hash_xml_text(target_xml)
         print(f"Saved dump_{i}.xml")
@@ -116,31 +107,6 @@ def main():
             prev_hash = current_hash
             
         print(f"Finished extracting '{playlist_name}'. Total unique screens: {i-1}")
-        
-        if is_new_run:
-            def get_dir_hash(d):
-                files = sorted(os.listdir(d))
-                h = hashlib.md5()
-                for f in files:
-                    if f.endswith(".xml"):
-                        h.update(hash_xml_text(os.path.join(d, f)).encode('utf-8'))
-                return h.hexdigest()
-                
-            old_hash = get_dir_hash(base_dir_name)
-            new_hash = get_dir_hash(dir_name)
-            
-            if old_hash == new_hash:
-                print("Data is identical to existing playlist folder. Replacing old folder.")
-                shutil.rmtree(base_dir_name)
-                os.rename(dir_name, base_dir_name)
-                dir_name = base_dir_name
-            else:
-                timestamp = time.strftime("%Y%m%d_%H%M%S")
-                new_final_name = f"{base_dir_name} - {timestamp}"
-                print(f"Data is different! Keeping both. New run saved as '{new_final_name}'.")
-                os.rename(dir_name, new_final_name)
-                dir_name = new_final_name
-                
         print(f"Directory: {dir_name}")
 
 if __name__ == "__main__":
