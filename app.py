@@ -191,9 +191,13 @@ def process_playlist(dump_dir, token, user_id, headers):
         playlist_id = create_resp.json()['Id']
         print(f"Populating playlist with {len(track_ids)} tracks...")
     
-    ids_str = ",".join(track_ids)
-    add_url = f"{JELLYFIN_URL}/Playlists/{playlist_id}/Items"
-    retry_request(requests.post, add_url, headers=headers, params={"userId": user_id, "ids": ids_str})
+    chunk_size = 100
+    for i in range(0, len(track_ids), chunk_size):
+        chunk = track_ids[i:i + chunk_size]
+        ids_str = ",".join(chunk)
+        add_url = f"{JELLYFIN_URL}/Playlists/{playlist_id}/Items"
+        retry_request(requests.post, add_url, headers=headers, params={"userId": user_id, "ids": ids_str})
+        print(f"  Added batch {i//chunk_size + 1}/{(len(track_ids) - 1)//chunk_size + 1} ({len(chunk)} tracks)")
     
     print(f"Done with '{playlist_name}'.")
 
