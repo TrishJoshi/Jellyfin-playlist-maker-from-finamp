@@ -147,7 +147,16 @@ def main():
             break
             
     if playlist_id:
-        print(f"Playlist '{playlist_name}' already exists. Appending tracks...")
+        print(f"Playlist '{playlist_name}' already exists. Fetching existing tracks to prevent duplicates...")
+        existing_items_resp = retry_request(requests.get, f"{JELLYFIN_URL}/Playlists/{playlist_id}/Items?userId={user_id}", headers=headers)
+        existing_track_ids = {item['Id'] for item in existing_items_resp.json().get('Items', [])}
+        
+        track_ids = [tid for tid in track_ids if tid not in existing_track_ids]
+        if not track_ids:
+            print("All tracks are already in the playlist. Nothing to add.")
+            sys.exit(0)
+            
+        print(f"Appending {len(track_ids)} new tracks...")
     else:
         print("Fetching Music library ID...")
         views_resp = retry_request(requests.get, f"{JELLYFIN_URL}/Users/{user_id}/Views", headers=headers)
@@ -164,8 +173,8 @@ def main():
             
         create_resp = retry_request(requests.post, f"{JELLYFIN_URL}/Playlists", json=create_payload, headers=headers)
         playlist_id = create_resp.json()['Id']
+        print(f"Populating playlist with {len(track_ids)} tracks...")
     
-    print(f"Populating playlist with {len(track_ids)} tracks...")
     ids_str = ",".join(track_ids)
     add_url = f"{JELLYFIN_URL}/Playlists/{playlist_id}/Items"
     retry_request(requests.post, add_url, headers=headers, params={"userId": user_id, "ids": ids_str})
