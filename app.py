@@ -72,13 +72,41 @@ def search_jellyfin_for_track(title, artist, user_id, headers):
         return None
 
 def main():
-    if len(sys.argv) < 3:
-        print("Usage: python app.py \"Playlist Name\" /path/to/xml/dumps")
+    if len(sys.argv) < 2:
+        print("Usage: python app.py [/path/to/xml/dumps]")
         sys.exit(1)
 
-    playlist_name = sys.argv[1]
-    dump_dir = sys.argv[2]
-    
+    # Backwards compatibility if user still provides the name
+    if len(sys.argv) == 3:
+        dump_dir = sys.argv[2]
+    else:
+        dump_dir = sys.argv[1]
+
+    xml_files = sorted(glob.glob(os.path.join(dump_dir, "*.xml")))
+    if not xml_files:
+        print(f"No XML files found in {dump_dir}. Aborting.")
+        sys.exit(1)
+        
+    playlist_name = None
+    try:
+        tree = ET.parse(xml_files[0])
+        root = tree.getroot()
+        prev_desc = ""
+        for node in root.iter('node'):
+            desc = node.get('content-desc', '')
+            if desc:
+                if re.search(r'\d+ Track(s)? \([\d:]+\)', desc):
+                    playlist_name = prev_desc
+                    break
+                prev_desc = desc
+    except ET.ParseError:
+        pass
+        
+    if not playlist_name:
+        print("Could not determine playlist name from the first XML file.")
+        sys.exit(1)
+        
+    print(f"Extracted playlist name: '{playlist_name}'")
     state_file = f"{playlist_name.replace(' ', '_')}_state.json"
     
     print("Authenticating with Jellyfin...")
@@ -92,7 +120,6 @@ def main():
         with open(state_file, 'r') as f:
             track_ids = json.load(f)
     else:
-        xml_files = sorted(glob.glob(os.path.join(dump_dir, "*.xml")))
         extracted_tracks = []
         seen_titles = set()
         
