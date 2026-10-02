@@ -8,6 +8,11 @@ import xml.etree.ElementTree as ET
 import json
 import shutil
 
+try:
+    from exceptions import IGNORE_SANITY_CHECK
+except ImportError:
+    IGNORE_SANITY_CHECK = []
+
 def run_adb_safe(cmd):
     while True:
         try:
@@ -159,10 +164,13 @@ def extract_single_playlist(target_pl):
     print(f"  Extracted {len(all_tracks)} unique tracks to tracks.json")
     
     if expected_count is not None and len(all_tracks) != expected_count:
-        print(f"  ERROR: SANITY CHECK FAILED! Expected {expected_count}, got {len(all_tracks)}.")
-        print(f"  (Corrupted run deleted, will retry this playlist later if you run the script again).")
-        shutil.rmtree(dir_name)
-        return False
+        if playlist_name in IGNORE_SANITY_CHECK:
+            print(f"  WARNING: Sanity check failed (Expected {expected_count}, got {len(all_tracks)}) but '{playlist_name}' is in exceptions.py! Proceeding.")
+        else:
+            print(f"  ERROR: SANITY CHECK FAILED! Expected {expected_count}, got {len(all_tracks)}.")
+            print(f"  (Corrupted run deleted, will retry this playlist later if you run the script again).")
+            shutil.rmtree(dir_name)
+            return False
         
     if is_new_run:
         old_tracks_file = os.path.join(base_dir_name, "tracks.json")
@@ -232,7 +240,7 @@ def main():
         if os.path.exists(tracks_file):
             with open(tracks_file, "r", encoding="utf-8") as f:
                 t = json.load(f)
-            if len(t) == pl["count"]:
+            if len(t) == pl["count"] or pl["name"] in IGNORE_SANITY_CHECK:
                 print(f"Skipping '{pl['name']}' (Already successfully extracted).")
                 continue
         playlists_to_extract.append(pl)
