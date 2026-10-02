@@ -130,7 +130,7 @@ def extract_single_playlist(target_pl):
     prev_hash = hash_xml_content_desc(target_xml)
     
     while True:
-        run_adb_safe(["adb", "shell", "input", "swipe", "500", "2000", "500", "800", "500"])
+        run_adb_safe(["adb", "shell", "input", "swipe", "500", "2000", "500", "1200", "500"])
         time.sleep(1)
         i += 1
         print(f"  Dumping screen {i}... ", end="", flush=True)
@@ -226,13 +226,11 @@ def main():
             break
             
         prev_hash = current_hash
-        # Use a smooth 700px scroll for the master list
         run_adb_safe(["adb", "shell", "input", "swipe", "500", "2000", "500", "700", "500"])
         time.sleep(1)
         
     print(f"\nTotal unique playlists discovered: {len(master_playlists)}")
     
-    # Filter out already successfully extracted playlists
     playlists_to_extract = []
     for pl in master_playlists:
         safe_name = pl["name"].replace("/", "_")
@@ -263,14 +261,12 @@ def main():
             break
             
         prev_hash = current_hash
-        # Swipe downwards to scroll UP
         run_adb_safe(["adb", "shell", "input", "swipe", "500", "700", "500", "2000", "500"])
         time.sleep(1)
     
     print("\n[Phase 2] Autonomous extraction beginning...")
     
     for target_pl in playlists_to_extract:
-        # Scroll down until we find the playlist
         found_x = None
         found_y = None
         prev_hash = ""
@@ -287,7 +283,6 @@ def main():
             for p in on_screen:
                 if p["name"] == target_pl["name"]:
                     if not is_bottom and (p["y"] > 2200 or p["y"] < 250):
-                        # Too close to edge, might be covered by UI. Let it scroll once more to center it.
                         break
                     found_x = p["x"]
                     found_y = p["y"]
@@ -307,16 +302,14 @@ def main():
         if found_x is None:
             continue
             
-        # Click the playlist!
         print(f"  Tapping on playlist at ({found_x}, {found_y})...")
         run_adb_safe(["adb", "shell", "input", "tap", str(found_x), str(found_y)])
-        time.sleep(2) # Wait for page to load
+        time.sleep(2)
         
         extract_single_playlist(target_pl)
         
-        # Press Back to return to the list
         run_adb_safe(["adb", "shell", "input", "keyevent", "4"])
-        time.sleep(2) # Wait for list to reload
+        time.sleep(2)
         
     print("\n==========================================================")
     print("All tasks completed!")
