@@ -93,6 +93,9 @@ flowchart TD
     Create --> Add
 ```
 
+### State Caching Mechanism (`_state.json`)
+To prevent bombarding the Jellyfin API with the exact same track searches on every single run, `app.py` caches the mapped Jellyfin GUIDs. Once a playlist's tracks are successfully searched and matched, a `<playlist_name>_state.json` file is generated inside the playlist's local dump folder (e.g. `playlists/Spring_2025/state.json` or similarly safely escaped filename). This file contains a raw JSON array of Jellyfin GUID strings (e.g. `["uuid-1", "uuid-2"]`). On subsequent runs, if this file exists, the script instantly loads the GUIDs, completely bypassing the expensive API search heuristic.
+
 ### Search Matching Algorithm
 Jellyfin's API search can be finicky. To ensure the highest match rate, `app.py` uses a cascading fallback heuristic:
 1. **Strict Context Match**: Queries the track Title. Filters the returned results looking for a 100% exact match of the Title AND the Artist.
