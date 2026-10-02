@@ -125,7 +125,7 @@ def extract_single_playlist(target_pl):
     prev_hash = hash_xml_content_desc(target_xml)
     
     while True:
-        run_adb_safe(["adb", "shell", "input", "swipe", "500", "2000", "500", "700", "500"])
+        run_adb_safe(["adb", "shell", "input", "swipe", "500", "2000", "500", "800", "500"])
         time.sleep(1)
         i += 1
         print(f"  Dumping screen {i}... ", end="", flush=True)
@@ -177,7 +177,8 @@ def extract_single_playlist(target_pl):
                 os.rename(dir_name, f"{base_dir_name} - {timestamp}")
         else:
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            os.rename(dir_name, f"{base_dir_name} - {timestamp}")
+            os.rename(base_dir_name, f"{base_dir_name} - old_{timestamp}")
+            os.rename(dir_name, base_dir_name)
             
     print(f"  Successfully extracted {playlist_name}!")
     return True
@@ -273,9 +274,11 @@ def main():
             current_hash = hash_xml_content_desc(temp_xml)
             on_screen = get_playlists_on_screen(temp_xml)
             
+            is_bottom = (current_hash == prev_hash and prev_hash != "")
+            
             for p in on_screen:
                 if p["name"] == target_pl["name"]:
-                    if p["y"] > 2100 or p["y"] < 250:
+                    if not is_bottom and (p["y"] > 2200 or p["y"] < 250):
                         # Too close to edge, might be covered by UI. Let it scroll once more to center it.
                         break
                     found_x = p["x"]
@@ -285,7 +288,7 @@ def main():
             if found_x is not None:
                 break
                 
-            if current_hash == prev_hash and prev_hash != "":
+            if is_bottom:
                 print(f"Could not find '{target_pl['name']}' on screen. Skipping for now.")
                 break
                 
