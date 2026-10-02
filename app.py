@@ -71,21 +71,11 @@ def search_jellyfin_for_track(title, artist, user_id, headers):
             return fallback_results[0]['Id']
         return None
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python app.py [/path/to/xml/dumps]")
-        sys.exit(1)
-
-    # Backwards compatibility if user still provides the name
-    if len(sys.argv) == 3:
-        dump_dir = sys.argv[2]
-    else:
-        dump_dir = sys.argv[1]
-
+def process_playlist(dump_dir, token, user_id, headers):
     xml_files = sorted(glob.glob(os.path.join(dump_dir, "*.xml")))
     if not xml_files:
-        print(f"No XML files found in {dump_dir}. Aborting.")
-        sys.exit(1)
+        print(f"No XML files found in {dump_dir}. Skipping.")
+        return
         
     playlist_name = None
     try:
@@ -103,15 +93,11 @@ def main():
         pass
         
     if not playlist_name:
-        print("Could not determine playlist name from the first XML file.")
-        sys.exit(1)
+        print(f"Could not determine playlist name from the first XML file in {dump_dir}. Skipping.")
+        return
         
     print(f"Extracted playlist name: '{playlist_name}'")
     state_file = f"{playlist_name.replace(' ', '_')}_state.json"
-    
-    print("Authenticating with Jellyfin...")
-    token, user_id = get_auth_token()
-    headers = {"Authorization": f'MediaBrowser Token="{token}"'}
     
     track_ids = []
     
@@ -159,8 +145,8 @@ def main():
                 print(f"  [Failed] Could not find: {title} - {artist}")
 
         if not track_ids:
-            print("No tracks found in Jellyfin. Aborting.")
-            sys.exit(1)
+            print("No tracks found in Jellyfin for this playlist. Skipping creation.")
+            return
             
         with open(state_file, 'w') as f:
             json.dump(track_ids, f)
@@ -184,7 +170,7 @@ def main():
         track_ids = [tid for tid in track_ids if tid not in existing_track_ids]
         if not track_ids:
             print("All tracks are already in the playlist. Nothing to add.")
-            sys.exit(0)
+            return
             
         print(f"Appending {len(track_ids)} new tracks...")
     else:
@@ -209,7 +195,32 @@ def main():
     add_url = f"{JELLYFIN_URL}/Playlists/{playlist_id}/Items"
     retry_request(requests.post, add_url, headers=headers, params={"userId": user_id, "ids": ids_str})
     
-    print("Done.")
+    print(f"Done with '{playlist_name}'.")
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python app.py [/path/to/xml/dumps | --all]")
+        sys.exit(1)
+
+    if sys.argv[1] == "--all":
+        dump_dirs = sorted([os.path.join("playlists", d) for d in os.listdir("playlists") if os.path.isdir(os.path.join("playlists", d))])
+    else:
+        if len(sys.argv) == 3:
+            dump_dirs = [sys.argv[2]]
+        else:
+            dump_dirs = [sys.argv[1]]
+            
+    print("Authenticating with Jellyfin...")
+    token, user_id = get_auth_token()
+    headers = {"Authorization": f'MediaBrowser Token="{token}"'}
+            
+    for dump_dir in dump_dirs:
+        print(f"\n==========================================================")
+        print(f"Processing directory: {dump_dir}")
+        process_playlist(dump_dir, token, user_id, headers)
+        
+    print("\n==========================================================")
+    print("All Jellyfin playlists have been processed!")
 
 if __name__ == "__main__":
     main()
